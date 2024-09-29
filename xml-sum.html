@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Somatório de XML</title>
+</head>
+
+<style>
+  body {
+    margin: 20px;
+    background-color: #fdfbf5;
+  }
+
+  label {
+    font-size: 18px;
+  }
+
+  div {
+    font-size: 18px;
+  }
+
+  #list_title {
+    color: rgb(156, 28, 28);
+  }
+
+  #sum_title {
+    color: rgb(60, 156, 22);
+  }
+
+  h2 {
+    font-size: 28px;
+  }
+
+  h3 {
+    color: rgb(36, 36, 207);
+    font-size: 22px;
+  }
+
+  table {
+    font-size: 20px;
+    border-collapse: collapse;
+  }
+
+  tr:first-child {
+    background-color: #efefef;
+  }
+
+  td {
+    min-width: 210px;
+  }
+
+  .total {
+    color: rgb(0, 133, 51);
+    font-weight: 900;
+  }
+</style>
+
+<body>
+  <form>
+    <div>
+      <label for="xml_files">Selecione os arquivos XML</label>
+      <input type="file" id="xml_files" name="xml_files" accept=".xml" multiple />
+    </div>
+  </form>
+
+  <h2 id="list_title" style="display: none;">Lista de notas selecionadas:</h2>
+  <div id="list_content" style="display: none;"></div>
+
+  <hr>
+
+  <h2 id="sum_title" style="display: none;">Somatorio das notas por CNPJ:</h2>
+  <div id="sum_content" style="display: none;"></div>
+
+  <script>
+
+    const showXmlListInfo = async (event) => {
+      event.preventDefault()
+      const files = document.getElementById("xml_files").files
+
+      let listContentString = ""
+      let arrCnpjNfe = []
+
+      for (let file of Array.from(files)) {
+        const text = await file.text();
+
+        parser = new DOMParser();
+        xmlDoc = parser.parseFromString(text, "text/xml");
+
+        listContentString += `Nota: ${xmlDoc.getElementsByTagName("nNF")[0].childNodes[0].nodeValue} CNPJ: ${xmlDoc.getElementsByTagName("CNPJDest")[0].childNodes[0].nodeValue}, Valor da nota: ${xmlDoc.getElementsByTagName("vNF")[0].childNodes[0].nodeValue}\n`
+        const nfeObj = {
+          CNPJDest: xmlDoc.getElementsByTagName("CNPJDest")[0].childNodes[0].nodeValue,
+          xNome: xmlDoc.getElementsByTagName("xNome")[1].childNodes[0].nodeValue,
+          xLgr: xmlDoc.getElementsByTagName("xLgr")[1].childNodes[0].nodeValue,
+          nNF: xmlDoc.getElementsByTagName("nNF")[0].childNodes[0].nodeValue,
+          vNF: xmlDoc.getElementsByTagName("vNF")[0].childNodes[0].nodeValue,
+          dhEmi: xmlDoc.getElementsByTagName("dhEmi")[0].childNodes[0].nodeValue,
+        }
+
+        addNfeToCnpjList(arrCnpjNfe, nfeObj)
+
+      };
+
+      setHtmlContent(listContentString, arrCnpjNfe);
+    }
+
+    const addNfeToCnpjList = (arrCnpjNfe, { CNPJDest, xNome, xLgr, nNF, vNF, dhEmi }) => {
+      const currDest = arrCnpjNfe.find((dest) => dest.CNPJDest == CNPJDest)
+      if (currDest) {
+        if (!currDest.nfList) currDest.nfList = []
+        currDest.nfList.push({ nNF, vNF, dhEmi })
+        currDest.vTot += Number.parseFloat(vNF)
+      } else {
+        arrCnpjNfe.push({
+          CNPJDest,
+          xNome,
+          xLgr,
+          nfList: [{ nNF, vNF, dhEmi }],
+          vTot: Number.parseFloat(vNF),
+        })
+      }
+    }
+
+    const setHtmlContent = (listContentString, arrCnpjNfe) => {
+      const listTitle = document.getElementById("list_title");
+      const listContent = document.getElementById("list_content");
+      if (listTitle && listContent) {
+        listContent.innerText = listContentString;
+        listContent.style.display = 'block';
+        listTitle.style.display = 'block';
+      } else {
+        listContent.innerText = '';
+        listContent.style.display = 'none';
+        listTitle.style.display = 'none';
+      }
+
+      const sumTitle = document.getElementById("sum_title");
+      const sumContent = document.getElementById("sum_content");
+      if (sumTitle && sumContent) {
+        document.getElementById("sum_content").replaceChildren([])
+        sumContent.appendChild(generateNfeTableByCnpj(arrCnpjNfe));
+        sumContent.style.display = 'block';
+        sumTitle.style.display = 'block';
+      } else {
+        document.getElementById("sum_content").replaceChildren([])
+        sumContent.style.display = 'none';
+        sumTitle.style.display = 'none';
+      }
+    }
+
+    const generateNfeTableByCnpj = (arrCnpjNfe) => {
+      const divContainer = document.createElement('div');
+      for (let nfeCnpjList of arrCnpjNfe) {
+        const div = document.createElement('div');
+        const h3 = document.createElement('h3');
+        h3.innerText = `${nfeCnpjList.CNPJDest} - ${nfeCnpjList.xNome}`;
+        div.appendChild(h3);
+        const h4 = document.createElement('h4');
+        h4.innerText = `${nfeCnpjList.xLgr}`;
+        div.appendChild(h4);
+
+        const tbl = document.createElement('table');
+        const trLabel0 = tbl.insertRow();
+        const tdLabel0 = trLabel0.insertCell();
+        tdLabel0.innerText = "Numero da nota";
+        const tdLabel1 = trLabel0.insertCell();
+        tdLabel1.innerText = "Valor";
+        const tdLabel2 = trLabel0.insertCell();
+        tdLabel2.innerText = "Data de Emissão";
+
+        for (let nfe of nfeCnpjList.nfList) {
+          const tr = tbl.insertRow();
+          const td0 = tr.insertCell();
+          td0.innerText = nfe.nNF;
+          const td1 = tr.insertCell();
+          td1.innerText = nfe.vNF;
+          const td2 = tr.insertCell();
+          td2.innerText = nfe.dhEmi;
+        }
+        const trTotal = tbl.insertRow();
+        trTotal.classList.add('total')
+        const tdTotal0 = trTotal.insertCell();
+        tdTotal0.innerText = "Valor Total";
+        const tdTotal1 = trTotal.insertCell();
+        tdTotal1.innerText = Number(nfeCnpjList.vTot).toFixed(2);
+        const tdTotal2 = trTotal.insertCell();
+        tdTotal2.innerText = "";
+
+        div.appendChild(tbl);
+        divContainer.appendChild(div);
+      }
+
+      return divContainer;
+    }
+
+    document.getElementById("xml_files").addEventListener("change", showXmlListInfo);
+
+    // document.getElementById("submit").addEventListener("click", showXmlListInfo);
+
+  </script>
+</body>
+
+</html>
